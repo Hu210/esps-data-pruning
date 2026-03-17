@@ -15,21 +15,6 @@ from datasets_tiny import TinyImageNet
 #  Load Data
 ########################################################################################################################
 
-class SESampler(torch.utils.data.Sampler):
-
-    def __init__(self, pool_indices, k):
-        self.pool_indices = np.asarray(pool_indices, dtype=np.int64)
-        self.k = int(k)
-        if len(self.pool_indices) < self.k:
-            raise ValueError(f"SESampler: pool size {len(self.pool_indices)} < k {self.k}")
-
-    def __iter__(self):
-        chosen = np.random.choice(self.pool_indices, size=self.k, replace=False)
-        return iter(chosen.tolist())
-
-    def __len__(self):
-        return self.k
-
 def load_cifar10_sub(args, target_probs=None, score=None, data_mask=None):
     """
     Load CIFAR10 dataset with specified transformations and subset selection.
@@ -59,30 +44,30 @@ def load_cifar10_sub(args, target_probs=None, score=None, data_mask=None):
     elif args.sample == 'beta':
         subset_mask = beta_sampling(1-args.subset_rate, args.c_d, target_probs, data_mask, score)
     
-    elif args.sample == 'SE2':
+    elif args.sample == 'balance':
         N = len(data_mask)
         k = int(args.subset_rate * N)
 
         start = 0
-        end = int(k+0.1*N)
+        end = int(k+(1.8-args.subset_rate)*0.1*N)
 
         end = max(end, k)
         end = min(end, N)
 
-        if args.keep == 'easy':
+        if args.keep == 'low':
             pool = data_mask[start:end]   
-            print(f"[SE-easy] N={N}, k={k}, start={start}, end={end}, pool={len(pool)}")
+            print(f"[Balance Sampling with low-score] N={N}, k={k}, start={start}, end={end}, pool={len(pool)}")
         else:
             rev = data_mask[::-1] 
             pool = rev[start:end]
-            print(f"[SE-hard] N={N}, k={k}, start={start}, end={end}, pool={len(pool)}")
+            print(f"[Balance Sampling with high-score] N={N}, k={k}, start={start}, end={end}, pool={len(pool)}")
 
-        se_sampler = SESampler(pool_indices=pool, k=k)
+        balance_sampling = BalanceSampling(pool_indices=pool, k=k)
 
         train_loader = torch.utils.data.DataLoader(
             train_data,                   
             batch_size=args.batch_size,
-            sampler=se_sampler,           
+            sampler=balance_sampling,           
             shuffle=False,                
             num_workers=args.workers,
             pin_memory=True
@@ -105,13 +90,13 @@ def load_cifar10_sub(args, target_probs=None, score=None, data_mask=None):
 
     else:
         k = int(args.subset_rate * len(data_mask))
-        keep = getattr(args, 'keep', 'hard')
-        if keep == 'easy':
+        keep = getattr(args, 'keep', 'high')
+        if keep == 'low':
             subset_mask = data_mask[:k]
-            print(f"Using easy samples (head slice of sorted mask), k={k}")
+            print(f"Using low-score samples, k={k}")
         else:
             subset_mask = data_mask[-k:]
-            print(f"Using hard samples (tail slice of sorted mask), k={k}")
+            print(f"Using high-score samples, k={k}")
     
     data_set = torch.utils.data.Subset(train_data, subset_mask)
     train_loader = torch.utils.data.DataLoader(data_set, batch_size=args.batch_size, shuffle=True,
@@ -157,30 +142,30 @@ def load_cifar100_sub(args, target_probs=None, score=None, data_mask=None):
     elif args.sample == 'beta':
         subset_mask = beta_sampling(1-args.subset_rate, args.c_d, target_probs, data_mask, score)
     
-    elif args.sample == 'SE2':
+    elif args.sample == 'balance':
         N = len(data_mask)
         k = int(args.subset_rate * N)
 
         start = 0
-        end = int(k+0.1*N)
+        end = int(k+(1.8-args.subset_rate)*0.1*N)
 
         end = max(end, k)
         end = min(end, N)
 
-        if args.keep == 'easy':
+        if args.keep == 'low':
             pool = data_mask[start:end]
-            print(f"[SE-easy] N={N}, k={k}, start={start}, end={end}, pool={len(pool)}")
+            print(f"[Balance Sampling with low-score] N={N}, k={k}, start={start}, end={end}, pool={len(pool)}")
         else:
             rev = data_mask[::-1]
             pool = rev[start:end]
-            print(f"[SE-hard] N={N}, k={k}, start={start}, end={end}, pool={len(pool)}")
+            print(f"[Balance Sampling with high-score] N={N}, k={k}, start={start}, end={end}, pool={len(pool)}")
 
-        se_sampler = SESampler(pool_indices=pool, k=k)
+        balance_sampling = BalanceSampling(pool_indices=pool, k=k)
 
         train_loader = torch.utils.data.DataLoader(
             train_data,                   
             batch_size=args.batch_size,
-            sampler=se_sampler,           
+            sampler=balance_sampling,           
             shuffle=False,                
             num_workers=args.workers,
             pin_memory=True
@@ -203,13 +188,13 @@ def load_cifar100_sub(args, target_probs=None, score=None, data_mask=None):
 
     else:
         k = int(args.subset_rate * len(data_mask))
-        keep = getattr(args, 'keep', 'hard')
-        if keep == 'easy':
+        keep = getattr(args, 'keep', 'high')
+        if keep == 'low':
             subset_mask = data_mask[:k]
-            print(f"Using easy samples (head slice of sorted mask), k={k}")
+            print(f"Using low-score samples, k={k}")
         else:
             subset_mask = data_mask[-k:]
-            print(f"Using hard samples (tail slice of sorted mask), k={k}")
+            print(f"Using high-score samples, k={k}")
 
     data_set = torch.utils.data.Subset(train_data, subset_mask)
     train_loader = torch.utils.data.DataLoader(data_set, batch_size=args.batch_size, shuffle=True,
@@ -225,6 +210,125 @@ def load_cifar100_sub(args, target_probs=None, score=None, data_mask=None):
                                               num_workers=args.workers, pin_memory=True)
     return train_loader, test_loader
 
+def load_tiny_sub(args, target_probs=None, score=None, data_mask=None):
+    mean = [0.485, 0.456, 0.406]
+    std  = [0.229, 0.224, 0.225]
+
+    train_transform = transforms.Compose([
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomCrop(64, padding=4),
+        transforms.ToTensor(),
+        transforms.Normalize(mean, std)
+    ])
+
+    test_transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize(mean, std),
+    ])
+
+    train_data = TinyImageNet(
+        root=args.data_path,
+        split='train',
+        transform=train_transform,
+        return_index=False
+    )
+
+    N = len(train_data)
+
+    if args.sample == 'random':
+        subset_mask = np.random.choice(N, int(args.subset_rate * N), replace=False)
+
+    elif args.sample == 'beta':
+        subset_mask = beta_sampling(
+            1 - args.subset_rate,
+            args.c_d,
+            target_probs,
+            data_mask,
+            score
+        )
+
+    elif args.sample == 'balance':
+        N = len(data_mask)
+        k = int(args.subset_rate * N)
+
+        start = 0
+        end = int(k+(1.8-args.subset_rate)*0.1*N)
+
+        end = max(end, k)
+        end = min(end, N)
+
+        if args.keep == 'low':
+            pool = data_mask[start:end]
+            print(f"[Balance Sampling with low-score] N={N}, k={k}, start={start}, end={end}, pool={len(pool)}")
+        else:
+            rev = data_mask[::-1]
+            pool = rev[start:end]
+            print(f"[Balance Sampling with high-score] N={N}, k={k}, start={start}, end={end}, pool={len(pool)}")
+
+        balance_sampling = BalanceSampling(pool_indices=pool, k=k)
+
+
+        train_loader = torch.utils.data.DataLoader(
+            train_data,
+            batch_size=args.batch_size,
+            sampler=balance_sampling,
+            shuffle=False,                  
+            num_workers=args.workers,
+            pin_memory=True
+        )
+
+        test_data = TinyImageNet(
+            root=args.data_path,
+            split='val',
+            transform=test_transform,
+            return_index=False
+        )
+        test_loader = torch.utils.data.DataLoader(
+            test_data,
+            batch_size=args.batch_size,
+            shuffle=False,
+            num_workers=args.workers,
+            pin_memory=True
+        )
+
+        return train_loader, test_loader
+        
+    else:
+        k = int(args.subset_rate * len(data_mask))
+        keep = getattr(args, 'keep', 'high')
+        if keep == 'low':
+            subset_mask = data_mask[:k]
+            print(f"Using low-score samples, k={k}")
+        else:
+            subset_mask = data_mask[-k:]
+            print(f"Using high-score samples, k={k}")
+
+    subset_data = torch.utils.data.Subset(train_data, subset_mask)
+
+    train_loader = torch.utils.data.DataLoader(
+        subset_data,
+        batch_size=args.batch_size,
+        shuffle=True,
+        num_workers=args.workers,
+        pin_memory=True
+    )
+
+    test_data = TinyImageNet(
+        root=args.data_path,
+        split='val',
+        transform=test_transform,
+        return_index=False
+    )
+
+    test_loader = torch.utils.data.DataLoader(
+        test_data,
+        batch_size=args.batch_size,
+        shuffle=False,
+        num_workers=args.workers,
+        pin_memory=True
+    )
+
+    return train_loader, test_loader
 
 def stratified_sampling(score, coreset_num):
     stratas = 50
@@ -297,126 +401,18 @@ def beta_sampling(prune_rate, c_d, target_probs, mask, score):
     remain_id = np.random.choice(data_length, p=joint_p/joint_p.sum(), size=subset_n, replace=False)
     return remain_id
 
-def load_tiny_sub(args, target_probs=None, score=None, data_mask=None):
-    mean = [0.485, 0.456, 0.406]
-    std  = [0.229, 0.224, 0.225]
+class BalanceSampling(torch.utils.data.Sampler):
 
-    train_transform = transforms.Compose([
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomCrop(64, padding=4),
-        transforms.ToTensor(),
-        transforms.Normalize(mean, std)
-    ])
+    def __init__(self, pool_indices, k):
+        self.pool_indices = np.asarray(pool_indices, dtype=np.int64)
+        self.k = int(k)
+        if len(self.pool_indices) < self.k:
+            raise ValueError(f"Balance Sampling: pool size {len(self.pool_indices)} < k {self.k}")
 
-    test_transform = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize(mean, std),
-    ])
+    def __iter__(self):
+        chosen = np.random.choice(self.pool_indices, size=self.k, replace=False)
+        return iter(chosen.tolist())
 
-    train_data = TinyImageNet(
-        root=args.data_path,
-        split='train',
-        transform=train_transform,
-        return_index=False
-    )
+    def __len__(self):
+        return self.k
 
-    N = len(train_data)
-
-    if args.sample == 'random':
-        subset_mask = np.random.choice(N, int(args.subset_rate * N), replace=False)
-
-    elif args.sample == 'beta':
-        subset_mask = beta_sampling(
-            1 - args.subset_rate,
-            args.c_d,
-            target_probs,
-            data_mask,
-            score
-        )
-
-    elif args.sample == 'SE2':
-        if data_mask is None:
-            raise ValueError("SE2 requires data_mask (sorted indices). Got None.")
-
-        k = int(args.subset_rate * N)
-
-        start = 0
-        end = int(k + 0.1 * N)   
-
-        end = max(end, k)
-        end = min(end, N)
-
-        if args.keep == 'easy':
-            pool = data_mask[start:end]    
-            print(f"[SE2-easy] N={N}, k={k}, start={start}, end={end}, pool={len(pool)}")
-        else:
-            rev = data_mask[::-1]           
-            pool = rev[start:end]
-            print(f"[SE2-hard] N={N}, k={k}, start={start}, end={end}, pool={len(pool)}")
-
-        se_sampler = SESampler(pool_indices=pool, k=k)
-
-
-        train_loader = torch.utils.data.DataLoader(
-            train_data,
-            batch_size=args.batch_size,
-            sampler=se_sampler,
-            shuffle=False,                  
-            num_workers=args.workers,
-            pin_memory=True
-        )
-
-        test_data = TinyImageNet(
-            root=args.data_path,
-            split='val',
-            transform=test_transform,
-            return_index=False
-        )
-        test_loader = torch.utils.data.DataLoader(
-            test_data,
-            batch_size=args.batch_size,
-            shuffle=False,
-            num_workers=args.workers,
-            pin_memory=True
-        )
-
-        return train_loader, test_loader
-        
-    else:
-        k = int(args.subset_rate * len(data_mask))
-        keep = getattr(args, 'keep', 'hard')
-        if keep == 'easy':
-
-            subset_mask = data_mask[:k]
-            print(f"Using easy samples (head slice of sorted mask), k={k}")
-        else:
-
-            subset_mask = data_mask[-k:]
-            print(f"Using hard samples (tail slice of sorted mask), k={k}")
-
-    subset_data = torch.utils.data.Subset(train_data, subset_mask)
-
-    train_loader = torch.utils.data.DataLoader(
-        subset_data,
-        batch_size=args.batch_size,
-        shuffle=True,
-        num_workers=args.workers,
-        pin_memory=True
-    )
-
-    test_data = TinyImageNet(
-        root=args.data_path,
-        split='val',
-        transform=test_transform,
-        return_index=False
-    )
-
-    test_loader = torch.utils.data.DataLoader(
-        test_data,
-        batch_size=args.batch_size,
-        shuffle=False,
-        num_workers=args.workers,
-        pin_memory=True
-    )
-
-    return train_loader, test_loader

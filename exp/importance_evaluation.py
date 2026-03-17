@@ -118,13 +118,13 @@ def dual(preds, window_size=10, dim=0):
     mask = np.argsort(score)
     return score, mask
 
-# Our Method
-def softmax_cosine(rearranged, T=50):
-    probs = torch.softmax(rearranged[:T], dim=-1)  # [T, N, C]
+
+def esps(rearranged, T=30):
+    probs = torch.softmax(rearranged[:T], dim=-1)  
     scores = []
     for t in range(probs.size(0) - 1):
-        a = probs[t]      # [N, C]
-        b = probs[t + 1]  # [N, C]
+        a = probs[t]      
+        b = probs[t + 1]  
 
         dot = (a * b).sum(dim=1)
         an = a.norm(p=2, dim=1) + 1e-12
@@ -135,9 +135,36 @@ def softmax_cosine(rearranged, T=50):
     mask = score.argsort()
     return score, mask
 
+def esps_noise(rearranged, targets, T=30):
+
+    probs = torch.softmax(rearranged[:T], dim=-1)   
+    esps_scores = []
+    for t in range(probs.size(0) - 1):
+        a = probs[t]      
+        b = probs[t + 1]  
+
+        dot = (a * b).sum(dim=1)
+        an = a.norm(p=2, dim=1) + 1e-12
+        bn = b.norm(p=2, dim=1) + 1e-12
+        cos = dot / (an * bn)
+
+        esps_scores.append(1.0 - cos)
+
+    esps = torch.stack(esps_scores, dim=0).mean(dim=0)   # [N]
+
+    targets_expanded = targets.view(1, -1, 1).expand(probs.size(0), -1, 1)   
+    gt_probs = probs.gather(dim=2, index=targets_expanded).squeeze(2)         
+    mean_conf = gt_probs.mean(dim=0)                                           
+
+    score = esps + (1.0 - mean_conf)
+    score = score.detach().cpu().numpy()
+    mask = score.argsort()
+
+    return score, mask
+
 def rearrange(args, probs, indexes):
     probs_window_rere = []
-    # Reorganize probabilities according to indexes
+    
     for i in range(probs.shape[0]):
         probs_window_re = torch.zeros_like(torch.tensor(probs[i]))
         probs_re = probs_window_re.index_add(0, torch.tensor(indexes[i], dtype=int), torch.tensor(probs[i]))
@@ -152,7 +179,7 @@ def rearrange(args, probs, indexes):
         train_data = datasets.CIFAR10(args.data_path, download=True, train=True)
     elif args.dataset == 'tiny-imagenet':
         train_dir = os.path.join(args.data_path, 'train')
-        train_data = datasets.ImageFolder(train_dir)  # 用 ImageFolder 的 targets 即可
+        train_data = datasets.ImageFolder(train_dir)
         targets = torch.tensor(train_data.targets)
         
     targets = torch.tensor(train_data.targets)
@@ -187,10 +214,10 @@ if __name__ == '__main__':
     targets, targets_expanded, target_probs, rearranged = rearrange(args, probs, indexes)
     
     # DUAL
-    print("DUAL score processing (T=60)")
-    score, mask = dual(target_probs[:60])
-    np.save(os.path.join(args.save_path, 'dual_score_T60.npy'), score)
-    np.save(os.path.join(args.save_path, 'dual_mask_T60.npy'), mask)
+    print("DUAL score processing (T=30)")
+    score, mask = dual(target_probs[:30])
+    np.save(os.path.join(args.save_path, 'dual_score_T30.npy'), score)
+    np.save(os.path.join(args.save_path, 'dual_mask_T30.npy'), mask)
     
     # DYNUNC
     print("DYN-UNC score processing")
@@ -249,9 +276,16 @@ if __name__ == '__main__':
     np.save(os.path.join(args.save_path, f"forgetting_score.npy"), score)
     np.save(os.path.join(args.save_path, f"forgetting_mask.npy"), mask)
 
-    # Softmax-Cosine (Ours)
-    print("SOFTMAX-COS score processing")
-    T = 50
-    score, mask = softmax_cosine(rearranged, T=T)
-    np.save(os.path.join(args.save_path, f"softcos_T{T}_score.npy"), score)
-    np.save(os.path.join(args.save_path, f"softcos_T{T}_mask.npy"),  mask)
+    # ESPS
+    print("ESPS score processing")
+    T = 10
+    score, mask = esps(rearranged, T=T)
+    np.save(os.path.join(args.save_path, f"esps_{T}_score.npy"), score)
+    np.save(os.path.join(args.save_path, f"esps_{T}_mask.npy"),  mask)
+
+    # ESPS-N
+    print("ESPS-N score processing")
+    T = 30
+    score, mask = esps_noise(rearranged, targets, T=T)
+    np.save(os.path.join(args.save_path, f"esps_n_{T}_score.npy"), score)
+    np.save(os.path.join(args.save_path, f"esps_n_{T}_mask.npy"), mask)

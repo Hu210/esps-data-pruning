@@ -19,7 +19,7 @@ parser = argparse.ArgumentParser(description='Trains ResNet on CIFAR',
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('--data_path', type=str, default='./data', help='Path to dataset')
 parser.add_argument('--dataset', type=str, default='cifar100',choices=['cifar10', 'cifar100', 'tiny-imagenet'],
-                    help='Choose between Cifar10 and 100.')
+                    help='Choose between CIFAR-10, CIFAR-100, and Tiny-ImageNet.')
 parser.add_argument('--arch', type=str, default='resnet18')
 
 # Optimization options
@@ -46,10 +46,10 @@ parser.add_argument('--target-probs-path', required=True, type=str, help='For DU
 parser.add_argument('--score-path', required=True, type=str, help='Path for score')
 parser.add_argument('--mask-path', required=True,type=str, help='Path for mask')
 parser.add_argument('--c_d', type=float, default=4, help='c_D for Beta sampling')
-parser.add_argument('--sample', type=str, default=None, choices=[None, 'random', 'stratified', 'beta', 'SE2'], help='sampling method')
+parser.add_argument('--sample', type=str, default=None, choices=[None, 'random', 'stratified', 'beta', 'balance'], help='sampling method')
 parser.add_argument('--mis-ratio', default=0.2, type=float, help='for CCS')
-# Keep Hard or Easy Sample
-parser.add_argument('--keep', default='hard', choices=['hard', 'easy'],help='choose whether to keep hard or easy samples')
+# Keep high-score or low-score samples
+parser.add_argument('--keep', default='high', choices=['high', 'low'],help='choose whether to keep high-score or low-score samples')
 
 
 args = parser.parse_args()

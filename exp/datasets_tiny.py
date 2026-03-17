@@ -37,7 +37,6 @@ class TinyImageNet(Dataset):
         val_dir = os.path.join(self.root, 'val')
         ann_path = os.path.join(val_dir, 'val_annotations.txt')
 
-        # 先讀 wnid → class index
         wnids = sorted(os.listdir(os.path.join(self.root, 'train')))
         self.class_to_idx = {wnid: i for i, wnid in enumerate(wnids)}
 
