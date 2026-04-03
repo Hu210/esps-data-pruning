@@ -74,6 +74,7 @@ python train_subset.py \
     --target-probs-path ./checkpoint/cifar10/42/generated_mask/target_probs.npy \
     --score-path ./checkpoint/cifar10/42/generated_mask/esps_10_mask.npy \
     --mask-path ./checkpoint/cifar10/42/generated_mask/esps_10_mask.npy \
+    --keep high \
     --sample balance
 ```
 
@@ -150,7 +151,8 @@ python train_subset.py \
     --subset_rate 0.3  \
     --target-probs-path ./checkpoint/tiny-imagenet/42/generated_mask/target_probs.npy \
     --score-path ./checkpoint/tiny-imagenet/42/generated_mask/esps_n_30_mask.npy \
-    --mask-path ./checkpoint/tiny-imagenet/42/generated_mask/esps_n_30_mask.npy
+    --mask-path ./checkpoint/tiny-imagenet/42/generated_mask/esps_n_30_mask.npy \
+    --keep low \
 ```
 
 For noise dataset we add Tiny_imageNet for 20% label noise on train data.  
