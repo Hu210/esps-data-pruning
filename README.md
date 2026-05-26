@@ -1,11 +1,32 @@
 
+# Efficient Data Pruning via Early-Stage Prediction Stability and Balanced Sampling
+
+Official implementation of the IEEE Access paper:
+
+> **Efficient Data Pruning via Early-Stage Prediction Stability and Balanced Sampling**  
+> Chih-Yao Hu, Po-Yung Chou, and Cheng-Hung Lin  
+> IEEE Access, 2026
+
+This repository provides an implementation of **Early-Stage Prediction Stability (ESPS)** for redundant sample pruning and **ESPS-N** for noisy sample pruning. The method uses early-stage training dynamics to estimate sample importance efficiently, and applies balanced sampling to improve performance under high pruning ratios.
+
+
+
+## Results
+
+<div align="center">
+  <img width="85%" src="./Graphical%20Abstract.png" alt="Graphical Abstract"/>
+</div>
+
+Test accuracy under different pruning ratios. ESPS consistently outperforms existing pruning methods across multiple pruning ratios on both CIFAR-10 and CIFAR-100, with particularly strong performance under high pruning ratios.
+
 ---
+
 ## Usage
 
 - **CIFAR Experiments (`exp/`)**: Pruning redundant samples on CIFAR-10 and CIFAR-100  
 - **Tiny-ImageNet Experiments (`exp/`)**: Pruning noisy samples with 20% label noise  
 
----
+
 
 ## Pruning Redundant Samples on CIFAR
 
@@ -29,7 +50,6 @@ python train.py \
 
 The collected training dynamics will be saved to the path specified by `--save_path`.
 
----
 
 ## Step 2: Evaluate Sample Importance (Score Computation)
 
@@ -52,7 +72,6 @@ This command generates two .npy files for each method:
 - `XXX_mask.npy`: Contains the sorted sample indexes based on their importance scores.
 
 
----
 
 ## Step3: Train Classifiers on the Pruned Dataset
 
@@ -83,7 +102,6 @@ In our experiments, we use a batch size of 32 when the pruning ratio exceeds 70%
 Please refer to the experimental settings section in our paper for more details.
 
 
----
 ## Pruning Noise on Tiny-ImageNet
 
 ## Step 1: Collect Training Dynamics
@@ -107,7 +125,6 @@ python train.py \
 
 The collected training dynamics will be saved to the path specified by `--save_path`.
 
----
 
 ## Step 2: Evaluate Sample Importance (Score Computation)
 
@@ -129,8 +146,6 @@ This command generates two .npy files for each method:
 
 - `XXX_mask.npy`: Contains the sorted sample indexes based on their importance scores.
 
-
----
 
 ## Step3: Train Classifiers on the Pruned Dataset
 
@@ -162,7 +177,8 @@ Please refer to the experimental settings section in our paper for more details.
 ---
 ### Attribution
 
-This code is mostly build upon 
+This code is mostly built upon:
+
 ```bibtex
 @misc{cho2025lightweightdatasetpruningtraining,
       title={Lightweight Dataset Pruning without Full Training via Example Difficulty and Prediction Uncertainty}, 
@@ -172,5 +188,24 @@ This code is mostly build upon
       archivePrefix={arXiv},
       primaryClass={cs.LG},
       url={https://arxiv.org/abs/2502.06905}, 
+}
+```
+
+
+## Citation
+
+If you find our work useful for your research, please cite our paper.
+
+```bibtex
+@ARTICLE{11513857,
+  author={Hu, Chih-Yao and Chou, Po-Yung and Lin, Cheng-Hung},
+  journal={IEEE Access},
+  title={Efficient Data Pruning via Early-Stage Prediction Stability and Balanced Sampling},
+  year={2026},
+  volume={14},
+  number={},
+  pages={74912-74922},
+  keywords={Training;Modeling;Accuracy;Timing;Stability;Labeling;Costing;Costs;Learning (artificial intelligence);Noise measurement;Data pruning;early-stage training;prediction stability;training efficiency;deep learning},
+  doi={10.1109/ACCESS.2026.3692050}
 }
 ```
